@@ -32,7 +32,7 @@ jobs:
 
       - name: 뉴스·주가 받아서 계산
         env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || secrets.EMINI_API_KEY }}
         run: python build.py
 
       - name: gh-pages 브랜치에 웹페이지 올리기
