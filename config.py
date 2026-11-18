@@ -13,7 +13,7 @@ import os
 #    키가 없으면 AI 판단 대신 키워드 점수로 계산합니다.
 # ----------------------------------------------------------------------------
 # 위에서부터 차례로 시도하고, 모두 실패하면 사용 가능한 flash 모델을 자동으로 찾습니다.
-GEMINI_MODELS = ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-flash-latest"]
+GEMINI_MODELS = ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-flash-latest", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"]
 
 
 def get_gemini_key() -> str:
