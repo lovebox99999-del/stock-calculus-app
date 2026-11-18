@@ -1,0 +1,48 @@
+name: 데이터 업데이트
+
+# 1시간마다(매시 23분), main 에 코드를 올렸을 때, 그리고 Actions 화면에서 직접 눌렀을 때 실행됩니다.
+on:
+  schedule:
+    - cron: "23 * * * *"
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-site
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: 라이브러리 설치
+        run: pip install -r requirements.txt
+
+      - name: 뉴스·주가 받아서 계산
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python build.py
+
+      - name: gh-pages 브랜치에 웹페이지 올리기
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd site
+          git init -q -b gh-pages
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "데이터 업데이트 $(date -u +'%Y-%m-%d %H:%M UTC')"
+          git push -q -f "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git" gh-pages
