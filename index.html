@@ -1,0 +1,490 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>미적분 주가 분석기</title>
+<script src="https://cdn.jsdelivr.net/npm/plotly.js-dist-min@2.35.2/plotly.min.js"></script>
+<style>
+:root {
+  --bg: #f9f9f7; --card: #ffffff; --ink: #0b0b0b; --ink2: #52514e; --muted: #898781;
+  --grid: #e1e0d9; --axis: #c3c2b7; --line: rgba(11,11,11,0.10);
+  --up: #e34948; --down: #2a78d6; --model: #6250d6; --accent: #0b0b0b;
+  --warn-bg: #fff6e0; --warn-ink: #6b4e00; --info-bg: #eef4fc; --info-ink: #184f95;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d0d0d; --card: #1a1a19; --ink: #f0efec; --ink2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --axis: #383835; --line: rgba(255,255,255,0.10);
+    --up: #e66767; --down: #3987e5; --model: #9085e9; --accent: #f0efec;
+    --warn-bg: #2e2510; --warn-ink: #f2d38a; --info-bg: #13233a; --info-ink: #9ec5f4;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0d0d0d; --card: #1a1a19; --ink: #f0efec; --ink2: #c3c2b7; --muted: #898781;
+  --grid: #2c2c2a; --axis: #383835; --line: rgba(255,255,255,0.10);
+  --up: #e66767; --down: #3987e5; --model: #9085e9; --accent: #f0efec;
+  --warn-bg: #2e2510; --warn-ink: #f2d38a; --info-bg: #13233a; --info-ink: #9ec5f4;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink);
+  font-family: system-ui, -apple-system, "Segoe UI", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  line-height: 1.6; font-size: 15px; }
+a { color: inherit; }
+.wrap { max-width: 1120px; margin: 0 auto; padding: 20px 16px 48px; }
+header h1 { margin: 0; font-size: 24px; letter-spacing: -0.01em; }
+header p { margin: 4px 0 0; color: var(--ink2); }
+.updated { color: var(--muted); font-size: 13px; margin-top: 6px; }
+nav.tabs { display: flex; gap: 4px; flex-wrap: wrap; margin: 18px 0 14px; border-bottom: 1px solid var(--line); }
+nav.tabs button { border: 0; background: none; color: var(--ink2); font: inherit; padding: 10px 14px; cursor: pointer;
+  border-bottom: 2px solid transparent; margin-bottom: -1px; }
+nav.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); font-weight: 600; }
+.controls { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; margin-bottom: 16px; }
+.controls label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--ink2); }
+select, input[type=search] { font: inherit; color: var(--ink); background: var(--card); border: 1px solid var(--line);
+  border-radius: 8px; padding: 8px 10px; min-width: 220px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button { border: 0; background: var(--card); color: var(--ink2); font: inherit; padding: 8px 12px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--bg); }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+.card h2 { font-size: 17px; margin: 0 0 4px; }
+.card h3 { font-size: 15px; margin: 0 0 8px; }
+.sub { color: var(--ink2); font-size: 13px; margin: 0 0 10px; }
+.metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin-bottom: 16px; }
+.metric { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+.metric .k { font-size: 12.5px; color: var(--ink2); }
+.metric .v { font-size: 22px; font-weight: 600; margin-top: 2px; }
+.metric .h { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.chart { width: 100%; }
+table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--ink2); font-weight: 600; white-space: nowrap; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tablebox { overflow-x: auto; }
+.pill { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--ink2); white-space: nowrap; }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+.note { border-radius: 10px; padding: 10px 14px; margin-bottom: 14px; font-size: 14px; }
+.note.warn { background: var(--warn-bg); color: var(--warn-ink); }
+.note.info { background: var(--info-bg); color: var(--info-ink); }
+details { margin-top: 8px; }
+details summary { cursor: pointer; color: var(--ink2); font-size: 13.5px; }
+.news li { margin-bottom: 10px; }
+.news .meta { color: var(--muted); font-size: 12.5px; }
+.linkbtn { border: 1px solid var(--line); background: var(--card); color: var(--ink); font: inherit; font-size: 13px;
+  padding: 4px 10px; border-radius: 8px; cursor: pointer; margin-right: 6px; }
+.formula { font-family: "Cambria Math", "Times New Roman", serif; font-size: 17px; background: var(--bg);
+  padding: 10px 14px; border-radius: 8px; overflow-x: auto; white-space: nowrap; }
+.muted { color: var(--muted); }
+footer { margin-top: 28px; color: var(--muted); font-size: 12.5px; }
+.loading { color: var(--muted); padding: 40px 0; text-align: center; }
+.controls[hidden] { display: none; }
+@media (max-width: 600px) { select, input[type=search] { min-width: 0; width: 100%; } .controls label { flex: 1 1 100%; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>미적분 주가 분석기</h1>
+    <p>뉴스에서 호재를 찾고, 주가를 미분·적분해서 흐름을 읽고, 그 예측이 과거에 맞았는지까지 스스로 채점합니다.</p>
+    <div class="updated" id="updated">데이터를 불러오는 중...</div>
+  </header>
+  <nav class="tabs" role="tablist" id="tabs"></nav>
+  <div class="controls" id="controls" hidden>
+    <label>종목
+      <select id="tickerSel"></select>
+    </label>
+    <label>분석 기간
+      <span class="seg" id="periodSeg"></span>
+    </label>
+  </div>
+  <main id="view"><div class="loading">불러오는 중...</div></main>
+  <footer>
+    이 페이지는 수학과 데이터 분석을 공부하기 위한 도구입니다. 점수와 예측은 투자 권유가 아니며, 실제 주가는 예측 범위를 벗어날 수 있습니다.
+    뉴스는 제목과 링크만 사용하며 저작권은 각 언론사에 있습니다. 데이터는 GitHub Actions 가 약 1시간마다 새로 계산합니다.
+  </footer>
+</div>
+<script>
+"use strict";
+const VIEWS = [["radar", "호재 레이더"], ["calc", "미분·적분 분석"], ["fc", "예측"], ["bt", "검증"], ["theory", "원리"]];
+const PERIODS = ["1개월", "3개월", "6개월", "1년"];
+const state = { view: "radar", ticker: "NVDA", period: "3개월", summary: null, cache: {} };
+
+// ---------- 도우미 ----------
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const safeUrl = (u) => /^https?:\/\//i.test(String(u || "")) ? esc(u) : "#";
+const fmt = (x, d = 2) => (x == null || !isFinite(x)) ? "–" : Number(x).toLocaleString("ko-KR", { minimumFractionDigits: d, maximumFractionDigits: d });
+const pct = (x, d = 2) => (x == null || !isFinite(x)) ? "–" : (x >= 0 ? "+" : "") + fmt(x, d) + "%";
+const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+function money(v, cur) {
+  if (v == null) return "–";
+  if (cur === "KRW") return fmt(v, 0) + "원";
+  if (cur === "USD") return "$" + fmt(v, 2);
+  return fmt(v, 2) + (cur ? " " + cur : "");
+}
+function ago(iso) {
+  const h = (Date.now() - new Date(iso).getTime()) / 3600000;
+  if (h < 1) return "방금";
+  if (h < 24) return Math.round(h) + "시간 전";
+  return Math.round(h / 24) + "일 전";
+}
+function kdate(s) { const d = new Date(s + "T00:00:00"); return (d.getMonth() + 1) + "월 " + d.getDate() + "일"; }
+function rgba(hex, a) { const h = hex.replace("#", ""); return `rgba(${parseInt(h.slice(0, 2), 16)},${parseInt(h.slice(2, 4), 16)},${parseInt(h.slice(4, 6), 16)},${a})`; }
+function metric(k, v, h) { return `<div class="metric"><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div>${h ? `<div class="h">${esc(h)}</div>` : ""}</div>`; }
+function note(kind, html) { return `<div class="note ${kind}">${html}</div>`; }
+function table(cols, rows) {
+  return `<div class="tablebox"><table><thead><tr>${cols.map(([k, n]) => `<th class="${n ? "num" : ""}">${esc(k)}</th>`).join("")}</tr></thead><tbody>${
+    rows.map((r) => `<tr>${r.map((c, i) => `<td class="${cols[i][1] ? "num" : ""}">${c}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+}
+function newsList(items) {
+  if (!items.length) return `<p class="muted">관련 기사가 없습니다.</p>`;
+  return `<ul class="news">${items.map((m) => `<li><a href="${safeUrl(m.link)}" target="_blank" rel="noopener noreferrer">${esc(m.title_ko || m.title)}</a><br>
+    <span class="meta">${esc(m.outlet)} · ${ago(m.published)} · ${esc(m.method)} 점수 ${m.score >= 0 ? "+" : ""}${fmt(m.score, 2)}${m.why ? " — " + esc(m.why) : ""}</span></li>`).join("")}</ul>`;
+}
+
+// ---------- 그래프 공통 ----------
+function baseLayout(height, extra = {}) {
+  return Object.assign({
+    height, margin: { l: 56, r: 70, t: 36, b: 40 },
+    paper_bgcolor: "rgba(0,0,0,0)", plot_bgcolor: "rgba(0,0,0,0)",
+    font: { family: getComputedStyle(document.body).fontFamily, color: css("--ink2"), size: 12.5 },
+    hovermode: "x unified",
+    legend: { orientation: "h", x: 0, y: 1.08, yanchor: "bottom" },
+    xaxis: { showgrid: false, linecolor: css("--axis"), tickfont: { color: css("--muted") }, rangebreaks: [{ bounds: ["sat", "mon"] }] },
+    yaxis: { gridcolor: css("--grid"), zeroline: false, tickfont: { color: css("--muted") } },
+  }, extra);
+}
+const PCONF = { displaylogo: false, responsive: true, modeBarButtonsToRemove: ["select2d", "lasso2d", "autoScale2d"] };
+function plot(id, traces, layout) {
+  if (!window.Plotly) { $(id).innerHTML = `<p class="muted">그래프 라이브러리를 불러오지 못했습니다. 새로고침해 보세요.</p>`; return; }
+  Plotly.react(id, traces, layout, PCONF);
+}
+function splitArea(x, y, xa, ya, alpha, nameUp, nameDown) {
+  const up = css("--up"), dn = css("--down");
+  return [
+    { x, y: y.map((v) => v > 0 ? v : 0), xaxis: xa, yaxis: ya, mode: "lines", line: { width: 0, color: up }, fill: "tozeroy",
+      fillcolor: rgba(up, alpha), name: nameUp || "", showlegend: !!nameUp, hoverinfo: "skip" },
+    { x, y: y.map((v) => v < 0 ? v : 0), xaxis: xa, yaxis: ya, mode: "lines", line: { width: 0, color: dn }, fill: "tozeroy",
+      fillcolor: rgba(dn, alpha), name: nameDown || "", showlegend: !!nameDown, hoverinfo: "skip" },
+  ];
+}
+
+// ---------- 데이터 ----------
+async function getJSON(url) {
+  const r = await fetch(url, { cache: "no-cache" });
+  if (!r.ok) throw new Error(url + " " + r.status);
+  return r.json();
+}
+async function loadTicker(t) {
+  const info = state.summary.tickers.find((x) => x.ticker === t);
+  if (!info) return null;
+  if (!state.cache[t]) state.cache[t] = await getJSON(`data/t/${info.file}.json`);
+  return state.cache[t];
+}
+
+// ---------- 화면 틀 ----------
+function readHash() {
+  const p = new URLSearchParams(location.hash.slice(1));
+  if (p.get("v") && VIEWS.some(([k]) => k === p.get("v"))) state.view = p.get("v");
+  if (p.get("t")) state.ticker = p.get("t");
+  if (p.get("p") && PERIODS.includes(p.get("p"))) state.period = p.get("p");
+}
+function writeHash() {
+  const p = new URLSearchParams({ v: state.view, t: state.ticker, p: state.period });
+  history.replaceState(null, "", "#" + p.toString());
+}
+function go(view, ticker) { if (ticker) state.ticker = ticker; state.view = view; render(); window.scrollTo({ top: 0 }); }
+function buildChrome() {
+  $("tabs").innerHTML = VIEWS.map(([k, n]) => `<button role="tab" data-v="${k}" aria-selected="${state.view === k}">${n}</button>`).join("");
+  $("tabs").onclick = (e) => { const b = e.target.closest("button"); if (b) go(b.dataset.v); };
+  const groups = {};
+  for (const t of state.summary.tickers) (groups[t.sector] ||= []).push(t);
+  $("tickerSel").innerHTML = Object.entries(groups).map(([g, ts]) =>
+    `<optgroup label="${esc(g)}">${ts.map((t) => `<option value="${esc(t.ticker)}">${esc(t.name)} (${esc(t.ticker)})</option>`).join("")}</optgroup>`).join("");
+  $("tickerSel").onchange = (e) => { state.ticker = e.target.value; render(); };
+  $("periodSeg").innerHTML = PERIODS.map((p) => `<button data-p="${p}" aria-pressed="${state.period === p}">${p}</button>`).join("");
+  $("periodSeg").onclick = (e) => { const b = e.target.closest("button"); if (b) { state.period = b.dataset.p; render(); } };
+}
+async function render() {
+  if (!state.summary.tickers.some((t) => t.ticker === state.ticker) && state.summary.tickers.length) state.ticker = state.summary.tickers[0].ticker;
+  writeHash();
+  for (const b of $("tabs").children) b.setAttribute("aria-selected", b.dataset.v === state.view);
+  for (const b of $("periodSeg").children) b.setAttribute("aria-pressed", b.dataset.p === state.period);
+  $("tickerSel").value = state.ticker;
+  const needsTicker = ["calc", "fc", "bt"].includes(state.view);
+  $("controls").hidden = !needsTicker;
+  $("periodSeg").parentElement.style.display = state.view === "calc" ? "" : "none";
+  const v = $("view");
+  try {
+    if (state.view === "radar") return viewRadar(v);
+    if (state.view === "theory") return viewTheory(v);
+    v.innerHTML = `<div class="loading">불러오는 중...</div>`;
+    const d = await loadTicker(state.ticker);
+    if (!d) { v.innerHTML = note("warn", "이 종목의 데이터가 없습니다."); return; }
+    if (state.view === "calc") viewCalc(v, d);
+    else if (state.view === "fc") viewForecast(v, d);
+    else viewBacktest(v, d);
+  } catch (err) {
+    v.innerHTML = note("warn", "데이터를 불러오지 못했습니다: " + esc(err.message));
+  }
+}
+function tickerHeader(d) {
+  return `<div class="card" style="padding:12px 16px"><h2>${esc(d.name)} (${esc(d.ticker)})</h2>
+    <p class="sub" style="margin:0">마지막 종가 ${money(d.last, d.currency)} (${esc(d.last_date)}) · 데이터 ${d.n_days}거래일 · 출처: ${esc(d.source)}</p></div>`;
+}
+
+// ---------- 1. 호재 레이더 ----------
+function viewRadar(v) {
+  const S = state.summary;
+  const counts = Object.entries(S.outlet_counts).map(([k, n]) => `${esc(k)} ${n}건`).join(" · ") || "수집된 헤드라인 없음";
+  const how = S.ai.count ? `AI 판단 ${S.ai.count}건 (${esc(S.ai.model)}), 나머지는 키워드 점수` : "키워드 점수";
+  let html = `<div class="card"><h2>호재 레이더</h2>
+    <p class="sub">블룸버그·월스트리트저널·로이터·파이낸셜타임스의 최근 3일 헤드라인에서 종목을 찾아 호재·악재 점수(-100~+100)를 매깁니다.</p>
+    <p style="margin:0"><b>헤드라인 ${S.headline_count}건</b> (${counts}) — 판단 방식: ${how}</p>
+    <details><summary>뉴스 출처별 수집 상태</summary>${table([["언론사"], ["경로"], ["받은 기사", 1], ["새 기사", 1], ["오류"]],
+      S.feed_report.map((r) => [esc(r["언론사"]), esc(r["경로"]), r["받은 기사"], r["새 기사"], esc(r["오류"])]))}</details></div>`;
+  if (S.ai.error && !S.ai.count) html += note("warn", "AI 판단을 쓰지 못해 키워드 점수로 계산했습니다. " + esc(S.ai.error));
+  if (S.brief) html += `<div class="card"><h3>오늘의 AI 브리핑</h3><p style="margin:0;white-space:pre-line">${esc(S.brief)}</p><p class="sub" style="margin:6px 0 0">작성: ${esc(S.brief_model)}</p></div>`;
+  if (!S.radar.length) { v.innerHTML = html + note("info", "지금은 종목과 연결되는 헤드라인이 없습니다. 다음 업데이트를 기다려 주세요."); return; }
+
+  html += `<div class="card"><h3>종목별 호재 점수</h3><p class="sub">빨강(오른쪽) = 호재, 파랑(왼쪽) = 악재. 최근 기사일수록, 같은 방향 기사가 여러 개일수록 점수가 커집니다.</p><div id="radarChart" class="chart"></div></div>`;
+  const tick = Object.fromEntries(S.tickers.map((t) => [t.ticker, t]));
+  const top = S.radar.filter((r) => r.score > 5).slice(0, 8);
+  if (top.length) {
+    html += `<div class="card"><h3>호재 상위 종목의 지금 주가 상태</h3>${table(
+      [["종목"], ["호재 점수", 1], ["국면"], ["최근 5일", 1], ["10일 예상", 1], [""]],
+      top.map((r) => { const t = tick[r.ticker];
+        return [`${esc(r.name)} <span class="muted">${esc(r.ticker)}</span>`, fmt(r.score, 0), t ? esc(t.phase) : "주가 없음",
+          t ? pct(t.chg5) : "–", t ? pct(t.fc) : "–",
+          t ? `<button class="linkbtn" data-go="calc" data-t="${esc(r.ticker)}">분석</button><button class="linkbtn" data-go="fc" data-t="${esc(r.ticker)}">예측</button>` : ""]; }))}</div>`;
+  }
+  html += `<div class="card"><h3>종목별 헤드라인</h3><p class="sub">제목을 누르면 원문으로 이동합니다.</p>`;
+  for (const r of S.radar.slice(0, 15)) {
+    const ms = S.mentions.filter((m) => m.ticker === r.ticker).slice(0, 6);
+    html += `<details><summary>${esc(r.name)} (${esc(r.ticker)}) · 호재 점수 ${r.score >= 0 ? "+" : ""}${fmt(r.score, 0)} · 기사 ${r.n}건</summary>
+      <div style="padding:8px 0 4px 4px">${newsList(ms)}${r.has_data ? `<button class="linkbtn" data-go="calc" data-t="${esc(r.ticker)}">미분·적분 분석 보기</button><button class="linkbtn" data-go="fc" data-t="${esc(r.ticker)}">예측 보기</button>` : ""}</div></details>`;
+  }
+  html += `</div><div class="card"><h3>점수표 전체</h3>${table(
+    [["종목"], ["분야"], ["호재 점수", 1], ["기사", 1], ["호재", 1], ["악재", 1], ["언론사"]],
+    S.radar.map((r) => [`${esc(r.name)} <span class="muted">${esc(r.ticker)}</span>`, esc(r.sector), fmt(r.score, 1), r.n, r.pos, r.neg, esc(r.outlets)]))}</div>`;
+  v.innerHTML = html;
+  v.querySelectorAll("[data-go]").forEach((b) => b.onclick = () => go(b.dataset.go, b.dataset.t));
+
+  const pos = S.radar.filter((r) => r.score >= 1).slice(0, 10), neg = S.radar.filter((r) => r.score <= -1).slice(-5);
+  const rows = pos.concat(neg);
+  if (!rows.length) { $("radarChart").innerHTML = `<p class="muted">점수가 0이 아닌 종목이 없습니다.</p>`; return; }
+  plot("radarChart", [{
+    type: "bar", orientation: "h", x: rows.map((r) => r.score), y: rows.map((r) => `${r.name} (${r.ticker})`),
+    marker: { color: rows.map((r) => r.score > 0 ? css("--up") : css("--down")) },
+    text: rows.map((r) => (r.score > 0 ? "+" : "") + Math.round(r.score)), textposition: "outside", cliponaxis: false,
+    textfont: { color: css("--ink") },
+    customdata: rows.map((r) => [r.n, r.outlets]),
+    hovertemplate: "%{y}<br>호재 점수 %{x:+.1f}<br>기사 %{customdata[0]}건 · %{customdata[1]}<extra></extra>",
+  }], baseLayout(80 + 30 * rows.length, {
+    hovermode: "closest", bargap: 0.4, showlegend: false, margin: { l: 10, r: 30, t: 10, b: 40 },
+    xaxis: { range: [-115, 115], title: { text: "호재 점수" }, gridcolor: css("--grid"), zeroline: true, zerolinecolor: css("--axis"), tickfont: { color: css("--muted") } },
+    yaxis: { autorange: "reversed", automargin: true, tickfont: { color: css("--ink2") } },
+  }));
+}
+
+// ---------- 2. 미분·적분 ----------
+function viewCalc(v, d) {
+  const P = d.periods[state.period] || d.periods[Object.keys(d.periods).pop()];
+  const s = d.series, st = P.start;
+  const x = s.d.slice(st), close = s.close.slice(st), trend = s.trend.slice(st), vel = s.v.slice(st), acc = s.a.slice(st);
+  const legs = P.legs, ups = legs.filter((l) => l.dir === "상승"), downs = legs.filter((l) => l.dir === "하락");
+  const notes = [];
+  if (ups.length) { const b = ups.reduce((a, c) => c.pct > a.pct ? c : a); notes.push(`가장 큰 상승 파동은 ${kdate(b.start)}부터 ${kdate(b.end)}까지 ${pct(b.pct, 1)}`); }
+  if (downs.length) { const b = downs.reduce((a, c) => c.pct < a.pct ? c : a); notes.push(`가장 큰 하락 파동은 ${kdate(b.start)}부터 ${kdate(b.end)}까지 ${pct(b.pct, 1)}`); }
+
+  v.innerHTML = tickerHeader(d) + `<div class="metrics">
+      ${metric(state.period + " 실제 변화", pct(P.net_actual))}
+      ${metric("오른 정도 (상승 구간 적분)", pct(P.up))}
+      ${metric("내린 정도 (하락 구간 적분)", "-" + fmt(P.down) + "%")}
+      ${metric("추세 효율", Math.round(P.efficiency * 100) + "%", "100%에 가까울수록 한 방향으로 곧게 움직임")}
+      ${metric("현재 국면", d.phase)}</div>
+    <div class="card"><p style="margin:0"><b>지금의 속도</b> ${pct(d.v0, 3)}/일, <b>가속도</b> ${pct(d.a0, 4)}/일². ${esc(d.phase_desc)}<br>
+      상승 구간은 ${P.up_days}일, 하락 구간은 ${P.down_days}일이었습니다.</p></div>
+    <div class="card"><div id="calcChart" class="chart"></div>
+      <p class="sub" style="margin-top:8px">가운데 그래프에서 빨갛게 칠한 넓이를 모두 더한 값이 '오른 정도', 파랗게 칠한 넓이가 '내린 정도'입니다.
+      검산: 속도를 적분해 얻은 순변화 ${pct(P.net_integral)} / 추세선이 실제로 움직인 양 ${pct(P.net_trend)}. 작은 차이는 평활화와 수치 적분의 오차입니다.</p></div>
+    <div class="card"><h3>적분이 쌓여 가는 모습</h3><div id="cumChart" class="chart"></div></div>
+    <div class="card"><h3>파동별 정리</h3><p class="sub">극점에서 다음 극점까지를 하나의 파동으로 보고, 그 구간의 속도를 적분한 값입니다.</p>
+      ${notes.length ? `<p>${notes.join(", ")}였습니다.</p>` : ""}
+      ${table([["시작"], ["끝"], ["방향"], ["기간(거래일)", 1], ["변화율", 1], ["하루 평균", 1]],
+        legs.map((l) => [l.start, l.end, `<span class="dot" style="background:${l.dir === "상승" ? css("--up") : css("--down")}"></span>${l.dir}`, l.days, pct(l.pct), pct(l.per_day, 3)]))}</div>`;
+
+  const ink = css("--ink"), ink2 = css("--ink2"), muted = css("--muted"), surf = css("--card");
+  const markers = [["peaks", "극대 (속도 0, +에서 -로)", "triangle-down", ink, 11], ["troughs", "극소 (속도 0, -에서 +로)", "triangle-up", ink, 11], ["inflections", "변곡점 (가속도 0)", "circle-open", muted, 8]];
+  const traces = [
+    { x, y: close, name: "실제 종가", mode: "lines", line: { color: muted, width: 1.2 }, hovertemplate: "%{y:,.2f}<extra>실제 종가</extra>" },
+    { x, y: trend, name: "추세선(평활화)", mode: "lines", line: { color: ink, width: 2 }, hovertemplate: "%{y:,.2f}<extra>추세선</extra>" },
+  ];
+  for (const [k, n, sym, col, size] of markers) {
+    const idx = P[k] || [];
+    if (idx.length) traces.push({ x: idx.map((i) => x[i]), y: idx.map((i) => trend[i]), name: n, mode: "markers",
+      marker: { symbol: sym, size, color: col, line: { width: 2, color: surf } }, hovertemplate: "%{y:,.2f}<extra>" + n.split(" ")[0] + "</extra>" });
+  }
+  traces.push(...splitArea(x, vel, "x2", "y2", 0.18, "상승 구간 (넓이 = 오른 정도)", "하락 구간 (넓이 = 내린 정도)"));
+  traces.push({ x, y: vel, xaxis: "x2", yaxis: "y2", name: "속도", showlegend: false, mode: "lines", line: { color: ink2, width: 2 }, hovertemplate: "%{y:+.3f} %/일<extra>속도</extra>" });
+  traces.push(...splitArea(x, acc, "x3", "y3", 0.10));
+  traces.push({ x, y: acc, xaxis: "x3", yaxis: "y3", name: "가속도", showlegend: false, mode: "lines", line: { color: ink2, width: 2 }, hovertemplate: "%{y:+.4f} %/일²<extra>가속도</extra>" });
+  const ax = (dom, title, anchor) => ({ domain: dom, title: { text: title }, gridcolor: css("--grid"), zeroline: true, zerolinecolor: css("--axis"), tickfont: { color: muted }, anchor });
+  const xa = (anchor, show) => ({ anchor, matches: "x", showticklabels: show, showgrid: false, linecolor: css("--axis"), tickfont: { color: muted }, rangebreaks: [{ bounds: ["sat", "mon"] }] });
+  plot("calcChart", traces, baseLayout(700, {
+    margin: { l: 60, r: 70, t: 50, b: 40 },
+    xaxis: xa("y", false), xaxis2: xa("y2", false), xaxis3: xa("y3", true),
+    yaxis: Object.assign(ax([0.52, 1], "가격", "x"), { zeroline: false }), yaxis2: ax([0.25, 0.47], "%/일", "x2"), yaxis3: ax([0, 0.2], "%/일²", "x3"),
+    annotations: [
+      { text: "<b>가격과 추세선</b>", xref: "paper", yref: "paper", x: 0, y: 1.0, yanchor: "bottom", showarrow: false, font: { color: ink } },
+      { text: "<b>속도 = 1차 미분</b> (색칠한 넓이 = 적분값)", xref: "paper", yref: "paper", x: 0, y: 0.47, yanchor: "bottom", showarrow: false, font: { color: ink } },
+      { text: "<b>가속도 = 2차 미분</b>", xref: "paper", yref: "paper", x: 0, y: 0.2, yanchor: "bottom", showarrow: false, font: { color: ink } },
+      { x: x[x.length - 1], y: vel[vel.length - 1], xref: "x2", yref: "y2", text: pct(vel[vel.length - 1]) + "/일", showarrow: false, xanchor: "left", xshift: 8, font: { color: ink } },
+    ],
+    legend: { orientation: "h", x: 0, y: 1.06, yanchor: "bottom" },
+  }));
+
+  const xc = x;
+  const up = P.cum_up, dn = P.cum_down.map((q) => -q), net = up.map((u, i) => u + dn[i]);
+  const cumTr = [[up, "누적 상승", css("--up")], [dn, "누적 하락", css("--down")], [net, "순변화 (상승 - 하락)", ink]];
+  plot("cumChart", cumTr.map(([y, n, c]) => ({ x: xc, y, name: n, mode: "lines", line: { color: c, width: 2 }, hovertemplate: "%{y:+.2f}<extra>" + n + "</extra>" })),
+    baseLayout(320, { yaxis: { title: { text: "누적 로그 변화 (×100)" }, gridcolor: css("--grid"), zeroline: true, zerolinecolor: css("--axis"), tickfont: { color: muted } },
+      annotations: cumTr.map(([y]) => ({ x: xc[xc.length - 1], y: y[y.length - 1], text: (y[y.length - 1] >= 0 ? "+" : "") + y[y.length - 1].toFixed(1), showarrow: false, xanchor: "left", xshift: 8, font: { color: ink } })) }));
+}
+
+// ---------- 3. 예측 ----------
+function viewForecast(v, d) {
+  const F = d.forecast, S = state.summary.settings, h = S.horizon, B = d.backtest;
+  const disc = F.discount < 0.99 ? `최근 3일 동안 이미 ${pct(F.recent3, 1)} 움직여서 남은 효과를 ${Math.round(F.discount * 100)}%만 반영했습니다.` : "최근 3일간 같은 방향으로 미리 크게 움직이지 않아 할인 없이 반영했습니다.";
+  let kNote = "";
+  if (Math.abs(F.k) < 0.05) kNote = note("info", "이 종목은 과거에 추세를 연장하는 방식이 거의 통하지 않았습니다. 그래서 추세의 몫이 0에 가깝고, 예측은 사실상 '모른다'에 가깝습니다.");
+  else if (F.k < 0) kNote = note("info", "추세 신뢰 계수가 음수입니다. 이 종목은 과거에 오르면 되돌리고 내리면 되돌리는 경향이 있었다는 뜻이라, 추세와 반대 방향으로 예측합니다.");
+  v.innerHTML = tickerHeader(d) + `<div class="metrics">
+      ${metric(h + "거래일 뒤 예상 변화", pct(F.total_pct))}
+      ${metric("오를 확률", Math.round(F.p_up * 100) + "%", "50%에 가까우면 방향을 알 수 없다는 뜻")}
+      ${metric("68% 범위", pct(F.band68[0], 1) + " ~ " + pct(F.band68[1], 1), "세 번에 두 번쯤 이 안에 들어옴")}
+      ${metric("추세의 몫", pct(F.trend_pct))}
+      ${metric("호재의 몫", pct(F.news_pct))}</div>
+    <div class="card"><div id="fcChart" class="chart"></div>
+      <p class="sub" style="margin-top:8px">점선이 가장 가능성 높은 경로, 짙은 띠가 68% 범위, 옅은 띠가 95% 범위입니다.
+      ${h}거래일 뒤 중앙값 ${money(F.center[h], d.currency)}, 68% 범위 ${money(F.lo68[h], d.currency)} ~ ${money(F.hi68[h], d.currency)}.</p></div>
+    <div class="card"><h3>이 숫자가 나온 과정</h3><ol style="margin:0;padding-left:20px">
+      <li><b>추세</b> — 지금 속도 ${pct(d.v0, 3)}/일, 가속도 ${pct(d.a0, 4)}/일²로 출발해 점점 힘이 빠진다고 보고 ${h}일 동안 적분하면 ${pct(F.raw_trend_pct)}입니다.
+        여기에 과거 성적으로 정한 <b>추세 신뢰 계수 k = ${F.k >= 0 ? "+" : ""}${fmt(F.k)}</b>를 곱해 ${pct(F.trend_pct)}가 됐습니다.</li>
+      <li><b>호재</b> — 이 종목의 호재 점수는 <b>${d.score >= 0 ? "+" : ""}${fmt(d.score, 0)}점</b>입니다. 최대 반영 강도 ${fmt(S.beta_pct, 1)}%에 점수 비율을 곱하고, ${disc} 그 결과가 ${pct(F.news_pct)}입니다.</li>
+      <li><b>범위</b> — 최근 60일의 하루 변동성은 ${fmt(d.sigma)}%입니다. 여기에 √${h}와 과거 오차로 맞춘 보정값 ${fmt(F.band_scale)}를 곱해 범위를 정했습니다.</li></ol></div>
+    ${kNote}
+    ${B.ok ? note("info", `참고로 이 방법의 과거 방향 적중률은 ${fmt(B.hit_rate * 100, 1)}%였습니다('무조건 오른다'는 ${fmt(B.base_up * 100, 1)}%). 자세한 내용은 '검증' 화면에서 볼 수 있습니다.`) : ""}
+    <div class="card"><h3>예측에 반영된 최근 기사</h3>${d.news.length ? newsList(d.news.slice(0, 8)) : `<p class="muted" style="margin:0">최근 네 언론사에서 이 종목 기사를 찾지 못해 호재 점수를 0으로 두었습니다.</p>`}</div>`;
+
+  const s = d.series, n = Math.min(90, s.d.length), m = css("--model");
+  const hx = s.d.slice(-n), hy = s.close.slice(-n);
+  const tr = [];
+  for (const [lo, hi, a, name] of [[F.lo95, F.hi95, 0.10, "95% 범위"], [F.lo68, F.hi68, 0.22, "68% 범위"]]) {
+    tr.push({ x: F.dates, y: lo, mode: "lines", line: { width: 0, color: m }, showlegend: false, hoverinfo: "skip" });
+    tr.push({ x: F.dates, y: hi, mode: "lines", line: { width: 0, color: m }, fill: "tonexty", fillcolor: rgba(m, a), name, hoverinfo: "skip" });
+  }
+  tr.push({ x: hx, y: hy, name: "실제 종가", mode: "lines", line: { color: css("--ink"), width: 2 }, hovertemplate: "%{y:,.2f}<extra>실제 종가</extra>" });
+  tr.push({ x: F.dates, y: F.center, name: "예측 중앙 경로", mode: "lines", line: { color: m, width: 2, dash: "dash" },
+    customdata: F.dates.map((_, i) => [F.lo68[i], F.hi68[i], F.lo95[i], F.hi95[i]]),
+    hovertemplate: "중앙 %{y:,.2f}<br>68% 범위 %{customdata[0]:,.2f} ~ %{customdata[1]:,.2f}<br>95% 범위 %{customdata[2]:,.2f} ~ %{customdata[3]:,.2f}<extra>예측</extra>" });
+  tr.push({ x: [F.dates[h]], y: [F.center[h]], mode: "markers", showlegend: false, hoverinfo: "skip", marker: { size: 9, color: m, line: { width: 2, color: css("--card") } } });
+  plot("fcChart", tr, baseLayout(460, {
+    shapes: [{ type: "line", x0: F.dates[0], x1: F.dates[0], y0: 0, y1: 1, yref: "paper", line: { color: css("--axis"), width: 1 } }],
+    annotations: [{ x: F.dates[0], y: 1, yref: "paper", text: "오늘", showarrow: false, yanchor: "bottom", font: { color: css("--muted") } },
+      { x: F.dates[h], y: F.center[h], text: fmt(F.center[h]), showarrow: false, xanchor: "left", xshift: 10, font: { color: css("--ink") } }],
+    yaxis: { title: { text: "가격" }, gridcolor: css("--grid"), zeroline: false, tickfont: { color: css("--muted") } },
+  }));
+}
+
+// ---------- 4. 검증 ----------
+function viewBacktest(v, d) {
+  const B = d.backtest, h = state.summary.settings.horizon;
+  let html = tickerHeader(d) + `<div class="card"><p style="margin:0">과거의 하루하루로 돌아가 <b>그날까지의 정보만으로</b> ${h}거래일 뒤를 예측하고, 실제 결과와 비교했습니다.
+    미래 데이터를 미리 보는 일이 없도록 속도·가속도·신뢰 계수·범위 모두 그 시점 이전 자료로만 계산합니다.</p></div>`;
+  if (!B.ok) { v.innerHTML = html + note("warn", `검증하기에는 데이터가 부족합니다(채점 가능한 예측 ${B.n_eval}개).`); return; }
+  let verdict;
+  if (B.significant && B.hit_rate > 0.5 && B.skill > 0) verdict = "이 종목에서는 이 방법이 동전 던지기(50%)보다 의미 있게 나았습니다. 다만 과거에 통했다고 앞으로도 통한다는 보장은 없습니다.";
+  else if (B.significant && B.hit_rate < 0.5) verdict = "방향을 반대로 맞힌 경우가 더 많았습니다. 이 종목은 추세가 이어지기보다 되돌려지는 성격이 강했다는 뜻입니다.";
+  else if (B.hit_rate > 0.55 && B.skill > 0) verdict = "맞힌 쪽으로 기울어 있지만, 표본이 적어서 우연일 가능성을 배제할 수 없습니다. 참고 정도로만 보는 것이 좋습니다.";
+  else verdict = "동전 던지기와 구분하기 어려운 성적입니다. 이 종목의 단기 방향은 이 방법으로 예측하기 어렵다고 보는 편이 정직합니다.";
+  html += `<div class="metrics">
+      ${metric("방향 적중률", fmt(B.hit_rate * 100, 1) + "%")}
+      ${metric("'무조건 오른다' 적중률", fmt(B.base_up * 100, 1) + "%", "아무 계산 없이 항상 오른다고 했을 때")}
+      ${metric("오차 개선", pct(B.skill * 100, 1), "'변화 없음' 예측보다 오차가 줄어든 정도")}
+      ${metric("68% 범위 적중", Math.round(B.coverage68 * 100) + "%", "68%에 가까울수록 범위가 잘 맞음")}
+      ${metric("추세 신뢰 계수 k", (B.k_now >= 0 ? "+" : "") + fmt(B.k_now))}</div>
+    <div class="card"><p style="margin:0"><b>채점 결과</b> — ${verdict}<br>
+      채점한 예측은 ${B.n_eval}개지만 ${h}일짜리 구간이 서로 겹치기 때문에 독립적인 표본은 약 ${Math.round(B.n_eff)}개입니다.
+      이 정도 표본에서는 적중률이 50%에서 ±${Math.round(2 * B.se * 100)}%p 이상 벗어나야 우연이 아니라고 볼 수 있습니다.</p></div>
+    <div class="card"><div id="btChart" class="chart"></div>
+      <p class="sub" style="margin-top:8px">점 하나가 과거의 예측 하나입니다. 오른쪽 위와 왼쪽 아래의 점은 방향을 맞힌 것이고, 대각선에 가까울수록 정확했던 것입니다.</p></div>
+    ${note("info", "호재 반영 부분은 검증에 포함되지 않았습니다. 과거 뉴스 기록이 없어서 '호재가 주가를 얼마나 움직였는지'는 채점할 수 없기 때문입니다.")}`;
+  v.innerHTML = html;
+  const p = B.points, span = Math.max(0.5, ...p.pred.map(Math.abs)) * 1.1;
+  plot("btChart", [
+    { x: [-span, span], y: [-span, span], mode: "lines", name: "예측 = 실제", line: { color: css("--muted"), width: 1 }, hoverinfo: "skip" },
+    { x: p.pred, y: p.actual, mode: "markers", name: "과거 예측 하나하나", marker: { size: 7, color: css("--model"), opacity: 0.45 },
+      customdata: p.d, hovertemplate: "%{customdata}<br>예측 %{x:+.2f}%<br>실제 %{y:+.2f}%<extra></extra>" },
+  ], baseLayout(460, { hovermode: "closest", margin: { l: 60, r: 30, t: 36, b: 50 },
+    xaxis: { title: { text: "그날의 예측 (%)" }, range: [-span, span], gridcolor: css("--grid"), zeroline: true, zerolinecolor: css("--axis"), tickfont: { color: css("--muted") } },
+    yaxis: { title: { text: "실제 결과 (%)" }, gridcolor: css("--grid"), zeroline: true, zerolinecolor: css("--axis"), tickfont: { color: css("--muted") } } }));
+}
+
+// ---------- 5. 원리 ----------
+function viewTheory(v) {
+  const S = state.summary.settings;
+  v.innerHTML = `<div class="card"><h2>이 페이지가 쓰는 수학</h2>
+    <h3 style="margin-top:14px">1. 로그 주가를 미분하면 수익률이 된다</h3>
+    <div class="formula">x(t) = ln P(t) &nbsp;⟹&nbsp; v(t) = dx/dt = P′(t) / P(t)</div>
+    <p>주가 P 대신 ln P 를 미분하면 1만 원짜리 주식과 100만 원짜리 주식을 같은 잣대(하루 몇 %)로 볼 수 있습니다. 이 v 를 <b>속도</b>, 한 번 더 미분한 a = dv/dt 를 <b>가속도</b>라고 부릅니다.</p>
+    <h3>2. 그대로 미분하면 안 되는 이유</h3>
+    <p>주가는 매일 들쭉날쭉해서 그대로 미분하면 잡음만 커집니다. 그래서 최근 ${S.window}거래일의 점들에 2차 다항식 x ≈ c₀ + c₁s + c₂s² 를 최소제곱으로 맞춘 뒤 그 다항식을 미분합니다. 속도는 c₁, 가속도는 2c₂ 입니다.</p>
+    <h3>3. 속도와 가속도의 부호로 국면을 나눈다</h3>
+    ${table([[""], ["속도 + (오르는 중)"], ["속도 − (내리는 중)"]], [["가속도 +", "상승 가속", "하락 둔화 (극소가 가까울 수 있음)"], ["가속도 −", "상승 둔화 (극대가 가까울 수 있음)", "하락 가속"]])}
+    <p>속도가 0이 되는 곳이 극대·극소, 가속도가 0이 되는 곳이 변곡점입니다.</p>
+    <h3>4. 적분하면 얼마나 올랐고 얼마나 내렸는지가 나온다</h3>
+    <div class="formula">∫ v dt = x(t₁) − x(t₀), &nbsp; U = ∫ max(v, 0) dt, &nbsp; D = ∫ max(−v, 0) dt</div>
+    <p>미적분의 기본정리에 따라 속도를 적분하면 변화량이 됩니다. 속도가 양수인 부분만 적분한 U 가 <b>오른 정도</b>, 음수인 부분만 적분한 D 가 <b>내린 정도</b>이고, 순변화는 U − D 입니다. 적분은 사다리꼴 공식으로 계산합니다. |U − D| / (U + D) 는 얼마나 한 방향으로 곧게 움직였는지를 나타내는 <b>추세 효율</b>입니다.</p>
+    <h3>5. 예측은 미래의 속도를 적분한 것</h3>
+    <div class="formula">r̂(h) = k · ∫₀ʰ (v₀ + a₀s) e<sup>−s/τ</sup> ds + β · (S/100) · d · (1 − e<sup>−h/3</sup>)</div>
+    <ul><li>앞 항: 지금의 속도 v₀ 와 가속도 a₀ 로 출발하되 시간이 갈수록 추세가 힘을 잃는다(τ = ${S.tau}일)고 보고 적분합니다.</li>
+      <li>k: 추세 신뢰 계수. 과거에 이 적분값이 실제 수익률과 얼마나 맞았는지를 보고 프로그램이 스스로 정합니다.</li>
+      <li>뒤 항: 호재 점수 S 를 반영합니다. β = ${S.beta_pct}% 는 최대 반영 강도, d 는 호재 방향으로 이미 많이 움직였을 때 줄여 주는 선반영 할인입니다.</li>
+      <li>범위: 하루 변동성 σ 에 √h 를 곱해 정합니다. 기간이 4배가 되면 범위는 2배가 됩니다.</li></ul>
+    <h3>6. 호재 점수</h3>
+    <div class="formula">wᵢ = 0.5<sup>tᵢ/T</sup>, &nbsp; S = 100 × (Σ wᵢsᵢ / Σ wᵢ) × (1 − e<sup>−Σwᵢ/1.5</sup>)</div>
+    <p>sᵢ 는 기사 하나의 점수(−1~+1, AI 또는 키워드 판단), tᵢ 는 기사가 나온 뒤 지난 시간, T = ${S.half_life}시간은 반감기입니다. 가운데 분수는 최근 기사에 비중을 더 준 <b>평균 논조</b>, 마지막 괄호는 기사가 충분히 쌓였는지를 나타내는 <b>확신도</b>입니다.</p>
+    <h3>7. 한계</h3>
+    <ul><li>과거의 모양에서 미래를 추정하는 방법이라 갑작스러운 사건은 예측할 수 없습니다.</li>
+      <li>주가의 단기 방향은 원래 맞히기 어렵습니다. 검증 화면의 적중률이 50% 근처라면 그것이 정직한 결과입니다.</li>
+      <li>호재가 주가를 얼마나 움직이는지는 가정값이며 검증되지 않았습니다.</li>
+      <li>헤드라인만 읽기 때문에 기사 본문의 맥락은 반영하지 못합니다.</li>
+      <li>데이터는 약 1시간마다 새로 계산되므로, 화면의 숫자는 위에 적힌 업데이트 시각 기준입니다.</li></ul></div>`;
+}
+
+// ---------- 시작 ----------
+(async function start() {
+  readHash();
+  try {
+    state.summary = await getJSON("data/summary.json");
+  } catch (err) {
+    $("updated").textContent = "";
+    $("view").innerHTML = note("warn", "아직 계산된 데이터가 없습니다. 자동 작업이 처음 실행될 때까지 몇 분만 기다린 뒤 새로고침해 주세요.");
+    return;
+  }
+  const up = new Date(state.summary.updated);
+  const mins = Math.round((Date.now() - up.getTime()) / 60000);
+  $("updated").textContent = `마지막 업데이트: ${up.toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })} (${mins < 60 ? mins + "분" : Math.round(mins / 60) + "시간"} 전) · 종목 ${state.summary.tickers.length}개`;
+  buildChrome();
+  render();
+  window.addEventListener("hashchange", () => { readHash(); render(); });
+  if (window.matchMedia) matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", () => render());
+})();
+</script>
+</body>
+</html>
